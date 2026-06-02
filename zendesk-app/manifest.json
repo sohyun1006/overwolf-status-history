@@ -1,0 +1,31 @@
+{
+  "name": "Overwolf Status Monitor",
+  "author": {
+    "name": "OP.GG",
+    "email": "hyuni@op.gg"
+  },
+  "defaultLocale": "en",
+  "private": true,
+  "version": "1.0.0",
+  "frameworkVersion": "2.0",
+  "location": {
+    "support": {
+      "ticket_sidebar": {
+        "url": "assets/iframe.html",
+        "flexible": true
+      },
+      "nav_bar": {
+        "url": "assets/iframe.html"
+      }
+    }
+  },
+  "parameters": [
+    {
+      "name": "historyBaseUrl",
+      "type": "text",
+      "required": false,
+      "secure": false,
+      "default": ""
+    }
+  ]
+}

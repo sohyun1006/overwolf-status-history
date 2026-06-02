@@ -1,0 +1,14 @@
+{
+  "app": {
+    "name": "Overwolf Status Monitor",
+    "short_description": "Shows whether Overwolf game-events data is stable or unstable for the overlays OP.GG depends on.",
+    "long_description": "Polls Overwolf's public game-events status endpoints and shows, at a glance, whether the Overwolf data behind OP.GG's TFT / LoL / Valorant overlays is currently stable. Helps support agents quickly tell users whether an overlay problem is an Overwolf-side data issue.",
+    "installation_instructions": "Live status needs no configuration. To enable 'status at ticket creation time', set History data base URL to the raw GitHub data folder of your overwolf-status-history repo (e.g. https://raw.githubusercontent.com/OWNER/REPO/main/data).",
+    "parameters": {
+      "historyBaseUrl": {
+        "label": "History data base URL",
+        "helpText": "Raw GitHub URL of the overwolf-status-history /data folder, e.g. https://raw.githubusercontent.com/OWNER/REPO/main/data . Leave blank to disable the historical lookup panel."
+      }
+    }
+  }
+}

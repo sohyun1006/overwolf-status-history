@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Overwolf Status Monitor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <div class="title">오버울프 데이터 상태</div>
+      <button id="refresh" class="refresh" title="새로고침" aria-label="새로고침">↻</button>
+    </div>
+
+    <div id="overall" class="overall loading">상태 확인 중…</div>
+
+    <div id="games"></div>
+
+    <div id="history" class="history"></div>
+
+    <div class="footer">
+      <span id="updated">—</span>
+      <div class="note">
+        오버울프 서버 반영까지 최대 5~10분 지연이 있을 수 있어요.
+      </div>
+    </div>
+  </div>
+
+  <script src="https://static.zdassets.com/zendesk_app_framework/sdk/2.0/zaf_sdk.min.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
