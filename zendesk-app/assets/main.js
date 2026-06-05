@@ -46,6 +46,12 @@ var ENDPOINT = function (id) {
   return "https://game-events-status.overwolf.com/" + id + "_prod.json";
 };
 
+// All-games summary file — the only place that carries the per-game GEP version.
+var GAMESTATUS_ENDPOINT = "https://game-events-status.overwolf.com/gamestatus_prod.json";
+
+// game_id -> GEP version string (current run). Filled by fetchVersions().
+var gepVersions = {};
+
 var STATE = {
   1: { ko: "정상", cls: "s1" },
   2: { ko: "불안정", cls: "s2" },
@@ -128,12 +134,33 @@ function fetchGame(id) {
     });
 }
 
+// Fetch the per-game GEP version from the all-games summary file.
+// Prefers the ow-electron version (populated for all our games), falling back
+// to the native one.
+function fetchVersions() {
+  return fetch(GAMESTATUS_ENDPOINT, { cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (list) {
+      var map = {};
+      (Array.isArray(list) ? list : []).forEach(function (g) {
+        map[g.game_id] = g.min_gep_version_electron || g.min_gep_version || null;
+      });
+      return map;
+    })
+    .catch(function () { return {}; });
+}
+
 function refresh() {
   var btn = document.getElementById("refresh");
   btn.classList.add("spinning");
 
-  Promise.all(GAMES.map(function (g) { return fetchGame(g.id); }))
-    .then(function (results) {
+  Promise.all([
+    Promise.all(GAMES.map(function (g) { return fetchGame(g.id); })),
+    fetchVersions()
+  ])
+    .then(function (out) {
+      var results = out[0];
+      gepVersions = out[1] || {};
       var byId = {};
       results.forEach(function (r) { byId[r.id] = r; });
       render(byId);
@@ -166,10 +193,13 @@ function render(byId) {
 
     var gameState = game ? normalize(game.state) : 0;
     var gs = STATE[gameState];
+    var ver = gepVersions[cfg.id];
     gameEl.innerHTML =
       '<div class="game-head">' +
         '<span class="dot ' + gs.cls + '"></span>' +
-        '<span>' + cfg.nameKo + "</span>" +
+        '<span>' + cfg.nameKo +
+          (ver ? ' <span class="gep">GEP ' + ver + "</span>" : "") +
+        "</span>" +
         '<span class="game-state ' + (game ? "state " + gs.cls : "") + '">' +
           (game ? "게임 전체: " + gs.ko : "불러오기 실패") +
         "</span>" +
