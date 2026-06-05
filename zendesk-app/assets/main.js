@@ -333,10 +333,23 @@ function fmtGap(ms) {
   return m ? h + "시간 " + m + "분" : h + "시간";
 }
 
-var HISTORY_TITLE = '<div class="history-head">🕓 티켓 인입 시각 기준 상태</div>';
+// Collapsible history panel. Starts collapsed; the live status above is primary.
+var historyCollapsed = true;
+
+// Wrap a body in the clickable header + toggleable body. The header click is
+// handled by a single delegated listener attached in init().
+function historyShell(bodyHtml) {
+  return '<div class="history-head" data-history-toggle>' +
+           '<span class="caret">' + (historyCollapsed ? "▸" : "▾") + "</span>" +
+           "<span>🕓 티켓 인입 시각 기준 상태</span>" +
+         "</div>" +
+         '<div class="history-body"' + (historyCollapsed ? ' style="display:none"' : "") + ">" +
+           bodyHtml +
+         "</div>";
+}
 
 function historyMsg(el, msg) {
-  el.innerHTML = HISTORY_TITLE + '<div class="history-empty">' + msg + "</div>";
+  el.innerHTML = historyShell('<div class="history-empty">' + msg + "</div>");
   resize();
 }
 
@@ -379,20 +392,18 @@ function loadHistory() {
 }
 
 function renderHistory(el, when, nearest) {
-  var title = HISTORY_TITLE;
-
   if (!nearest) {
-    el.innerHTML = title +
+    el.innerHTML = historyShell(
       '<div class="history-sub">인입: ' + fmtLocal(when) + "</div>" +
       '<div class="history-empty">이 시각 부근의 기록이 없어요. ' +
-      "(로깅 시작 이전이거나 기록이 누락된 구간일 수 있어요.)</div>";
+      "(로깅 시작 이전이거나 기록이 누락된 구간일 수 있어요.)</div>");
     return;
   }
 
   var snap = nearest.snap;
   var snapTime = new Date(Date.parse(snap.t));
   var far = nearest.gapMs > HISTORY_WINDOW_MS;
-  var html = title +
+  var html =
     '<div class="history-sub">인입 ' + fmtLocal(when) +
     " · 기록 " + fmtLocal(snapTime) + " 기준</div>" +
     (far
@@ -423,7 +434,7 @@ function renderHistory(el, when, nearest) {
     html += "</div>";
   });
 
-  el.innerHTML = html;
+  el.innerHTML = historyShell(html);
 }
 
 // ---------------------------------------------------------------------------
@@ -460,6 +471,18 @@ var zafSdkPresent = false;
 
 function init() {
   document.getElementById("refresh").addEventListener("click", refresh);
+
+  // Delegated toggle for the collapsible history panel (#history is rebuilt on
+  // each render, so listen on the stable container).
+  document.getElementById("history").addEventListener("click", function (e) {
+    if (!e.target.closest("[data-history-toggle]")) return;
+    historyCollapsed = !historyCollapsed;
+    var body = document.querySelector("#history .history-body");
+    var caret = document.querySelector("#history .caret");
+    if (body) body.style.display = historyCollapsed ? "none" : "";
+    if (caret) caret.textContent = historyCollapsed ? "▸" : "▾";
+    resize();
+  });
 
   zafSdkPresent = typeof ZAFClient !== "undefined";
   if (zafSdkPresent) {

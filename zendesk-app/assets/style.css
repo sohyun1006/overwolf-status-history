@@ -131,7 +131,19 @@ body {
   font-size: 12.5px;
   font-weight: 700;
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
 }
+.history-head:hover { color: var(--ink); }
+.history-head .caret {
+  font-size: 10px;
+  color: var(--muted);
+  width: 10px;
+}
+.history-body { margin-top: 4px; }
 .history-sub {
   font-size: 11px;
   color: var(--muted);
