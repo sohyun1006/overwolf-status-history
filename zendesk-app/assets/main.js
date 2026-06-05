@@ -55,12 +55,14 @@ var STATE = {
 
 var POLL_MS = 60 * 1000;
 
-// Base URL of the overwolf-status-history repo's /data folder, e.g.
-// "https://raw.githubusercontent.com/OWNER/REPO/main/data". Normally provided
-// via the app's "History data base URL" setting; this const is a fallback.
-var HISTORY_BASE_URL = "";
+// Base URL of the overwolf-status-history repo's /data folder. The app's
+// "History data base URL" setting overrides this when set; this hardcoded
+// fallback guarantees the history panel works even if the setting isn't
+// delivered to the iframe (which was flaky in practice).
+var HISTORY_BASE_URL = "https://raw.githubusercontent.com/sohyun1006/overwolf-status-history/main/data";
 
-// Show the historical snapshot only if it's within this window of the ticket time.
+// Snapshots closer than this to the ticket time are shown as trustworthy;
+// further ones still display but with a "참고용" (approximate) caveat.
 var HISTORY_WINDOW_MS = 20 * 60 * 1000;
 
 var appSettings = {};
@@ -293,17 +295,39 @@ function fmtLocal(date) {
   });
 }
 
+function fmtGap(ms) {
+  var min = Math.round(ms / 60000);
+  if (min < 60) return min + "분";
+  var h = Math.floor(min / 60);
+  var m = min % 60;
+  return m ? h + "시간 " + m + "분" : h + "시간";
+}
+
+var HISTORY_TITLE = '<div class="history-head">🕓 티켓 인입 시각 기준 상태</div>';
+
+function historyMsg(el, msg) {
+  el.innerHTML = HISTORY_TITLE + '<div class="history-empty">' + msg + "</div>";
+  resize();
+}
+
 // Load once per ticket. Looks up the snapshot nearest the ticket's creation time.
 function loadHistory() {
   var el = document.getElementById("history");
   var base = historyBaseUrl();
-  console.log("[Overwolf Status] history base =", JSON.stringify(base), "settings =", appSettings);
-  if (!base || !zafClient) { el.innerHTML = ""; return; }
+
+  if (!zafClient) {
+    historyMsg(el, zafSdkPresent
+      ? "Zendesk 연결 초기화 실패 (ZAFClient.init이 null). 과거 조회를 사용할 수 없어요."
+      : "ZAF SDK가 로드되지 않았어요. 과거 조회를 사용할 수 없어요.");
+    return;
+  }
+  if (!base) { historyMsg(el, "과거 데이터 주소(History data base URL)가 설정되지 않았어요."); return; }
+
+  historyMsg(el, "불러오는 중…");
 
   zafClient.get("ticket.createdAt").then(function (res) {
     var iso = res && res["ticket.createdAt"];
-    console.log("[Overwolf Status] ticket.createdAt =", iso);
-    if (!iso) { el.innerHTML = ""; resize(); return; } // not a ticket context
+    if (!iso) { historyMsg(el, "티켓 인입 시각을 불러올 수 없어요. (티켓 화면에서만 동작)"); return; }
     var when = new Date(iso);
     var targetMs = when.getTime();
 
@@ -315,26 +339,36 @@ function loadHistory() {
         var all = lists.reduce(function (a, b) { return a.concat(b); }, []);
         renderHistory(el, when, nearestSnapshot(all, targetMs));
         resize();
+      })
+      .catch(function (e) {
+        historyMsg(el, "과거 데이터를 불러오지 못했어요: " + (e && e.message ? e.message : e));
       });
-  }).catch(function () { el.innerHTML = ""; });
+  }).catch(function (e) {
+    historyMsg(el, "티켓 정보를 불러오지 못했어요: " + (e && e.message ? e.message : e));
+  });
 }
 
 function renderHistory(el, when, nearest) {
-  var title = '<div class="history-head">🕓 티켓 인입 시각 기준 상태</div>';
+  var title = HISTORY_TITLE;
 
-  if (!nearest || nearest.gapMs > HISTORY_WINDOW_MS) {
+  if (!nearest) {
     el.innerHTML = title +
       '<div class="history-sub">인입: ' + fmtLocal(when) + "</div>" +
-      '<div class="history-empty">해당 시각의 기록이 없어요. ' +
+      '<div class="history-empty">이 시각 부근의 기록이 없어요. ' +
       "(로깅 시작 이전이거나 기록이 누락된 구간일 수 있어요.)</div>";
     return;
   }
 
   var snap = nearest.snap;
   var snapTime = new Date(Date.parse(snap.t));
+  var far = nearest.gapMs > HISTORY_WINDOW_MS;
   var html = title +
     '<div class="history-sub">인입 ' + fmtLocal(when) +
-    " · 기록 " + fmtLocal(snapTime) + " 기준</div>";
+    " · 기록 " + fmtLocal(snapTime) + " 기준</div>" +
+    (far
+      ? '<div class="history-empty">⚠️ 인입 시각과 ' + fmtGap(nearest.gapMs) +
+        " 차이 나는 기록이에요. 정확도가 낮으니 참고용으로만 보세요.</div>"
+      : "");
 
   GAMES.forEach(function (cfg) {
     var gobj = (snap.g || {})[cfg.id] || (snap.g || {})[String(cfg.id)];
@@ -392,12 +426,19 @@ function resize() {
   });
 }
 
+var zafSdkPresent = false;
+
 function init() {
   document.getElementById("refresh").addEventListener("click", refresh);
 
-  if (typeof ZAFClient !== "undefined") {
+  zafSdkPresent = typeof ZAFClient !== "undefined";
+  if (zafSdkPresent) {
     try { zafClient = ZAFClient.init(); } catch (e) { zafClient = null; }
   }
+
+  // Always attempt history; loadHistory() shows a clear message for every case
+  // (no SDK / no client / not a ticket / no data) instead of silently doing nothing.
+  loadHistory();
 
   if (zafClient) {
     // Resize once the app is registered/activated — invokes fired earlier are
@@ -409,7 +450,7 @@ function init() {
     if (window.ResizeObserver) {
       new ResizeObserver(pushHeight).observe(document.getElementById("app"));
     }
-    // Read app settings, then look up the ticket's historical status once.
+    // Read app settings, then refresh the historical lookup with them applied.
     zafClient.metadata().then(function (m) {
       appSettings = (m && m.settings) || {};
       loadHistory();
