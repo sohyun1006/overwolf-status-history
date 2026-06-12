@@ -122,6 +122,49 @@ body {
   margin: 2px 0 0 17px;
 }
 
+.patches:not(:empty) {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.patches-head {
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.patch-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0;
+}
+.patch-row + .patch-row { border-top: 1px dashed var(--border); }
+.patch-game { font-size: 12px; font-weight: 600; }
+.patch-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.patch-ver {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--gray-bg);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.patch-date { font-size: 11px; color: var(--muted); }
+.patch-ago { color: var(--ink); }
+.patches-note {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
 .history:not(:empty) {
   margin-top: 14px;
   padding-top: 12px;

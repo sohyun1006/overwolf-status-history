@@ -1,0 +1,40 @@
+name: game-patches
+
+on:
+  schedule:
+    # Hourly. Patches ship ~every 2 weeks, so the conditional commit below means
+    # this normally pushes nothing — it only commits when a new patch is detected.
+    - cron: "17 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+# Don't race the snapshot workflow's push (both touch data/ and push to main).
+concurrency:
+  group: snapshot
+  cancel-in-progress: false
+
+jobs:
+  patches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Update latest patches
+        run: node scripts/patches.mjs
+      - name: Commit if changed
+        run: |
+          git config user.name "overwolf-status-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/patches.json
+          if git diff --cached --quiet; then
+            echo "no patch change"
+          else
+            git commit -m "patches $(date -u +%FT%TZ)"
+            # Rebase onto any snapshot commits pushed since checkout, then push.
+            git pull --rebase --autostash origin main
+            git push
+          fi

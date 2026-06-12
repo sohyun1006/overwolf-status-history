@@ -49,6 +49,15 @@ var ENDPOINT = function (id) {
 // All-games summary file — the only place that carries the per-game GEP version.
 var GAMESTATUS_ENDPOINT = "https://game-events-status.overwolf.com/gamestatus_prod.json";
 
+// Latest LoL / Valorant patch (version + official release date) is published as
+// patches.json alongside the history data, by the overwolf-status-history repo's
+// scheduled scraper. We read it from there rather than calling Riot directly:
+// no public, key-less endpoint exposes a patch's real *release* date in-browser
+// (valorant-api's buildDate is the build date — days early — and Data Dragon has
+// no date and labels LoL "16.x" while the public patch notes say "26.x"). The
+// scraper reads Riot's own news pages server-side, where there's no CORS/auth wall.
+// File: <historyBaseUrl>/patches.json
+
 // game_id -> GEP version string (current run). Filled by fetchVersions().
 var gepVersions = {};
 
@@ -150,13 +159,35 @@ function fetchVersions() {
     .catch(function () { return {}; });
 }
 
+// Normalize one game's patch entry from patches.json into { patch, dateMs }.
+function toPatchInfo(o) {
+  if (!o || !o.patch) return null;
+  var ms = o.date ? Date.parse(o.date) : NaN;
+  return { patch: o.patch, dateMs: isNaN(ms) ? null : ms };
+}
+
+// Read the published patch versions/dates. Lives next to the history data, so it
+// shares the same base URL (and is unavailable if that isn't configured).
+function fetchPatches() {
+  var base = historyBaseUrl();
+  if (!base) return Promise.resolve({});
+  return fetch(base + "/patches.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (j) {
+      var g = (j && j.games) || {};
+      return { lol: toPatchInfo(g.lol), valorant: toPatchInfo(g.valorant) };
+    })
+    .catch(function () { return {}; });
+}
+
 function refresh() {
   var btn = document.getElementById("refresh");
   btn.classList.add("spinning");
 
   Promise.all([
     Promise.all(GAMES.map(function (g) { return fetchGame(g.id); })),
-    fetchVersions()
+    fetchVersions(),
+    fetchPatches()
   ])
     .then(function (out) {
       var results = out[0];
@@ -164,6 +195,7 @@ function refresh() {
       var byId = {};
       results.forEach(function (r) { byId[r.id] = r; });
       render(byId);
+      renderPatches(out[2] || {});
     })
     .catch(function (err) {
       renderFatal(err);
@@ -271,6 +303,48 @@ function stamp() {
   var ss = String(now.getSeconds()).padStart(2, "0");
   document.getElementById("updated").textContent =
     "마지막 업데이트 " + hh + ":" + mm + ":" + ss;
+}
+
+// ---------------------------------------------------------------------------
+// Latest game patches — "when did LoL / Valorant last patch?"
+// Reference info for agents triaging "오버레이가 안 떠요" right after a patch.
+// ---------------------------------------------------------------------------
+function fmtPatchDate(ms) {
+  return new Date(ms).toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
+}
+
+function fmtDaysAgo(ms) {
+  var days = Math.floor((Date.now() - ms) / 86400000);
+  if (days <= 0) return "오늘";
+  if (days === 1) return "어제";
+  return days + "일 전";
+}
+
+function patchMetaHtml(info) {
+  if (!info || !info.patch) {
+    return '<span class="patch-date">불러오기 실패</span>';
+  }
+  var date = info.dateMs
+    ? '<span class="patch-date">' + fmtPatchDate(info.dateMs) +
+        ' <span class="patch-ago">(' + fmtDaysAgo(info.dateMs) + ")</span></span>"
+    : '<span class="patch-date">날짜 확인 불가</span>';
+  return '<span class="patch-ver">' + info.patch + "</span>" + date;
+}
+
+function renderPatches(data) {
+  var el = document.getElementById("patches");
+  var rows = [
+    { name: "리그 오브 레전드", info: data.lol },
+    { name: "발로란트", info: data.valorant }
+  ];
+  var body = rows.map(function (r) {
+    return '<div class="patch-row">' +
+      '<span class="patch-game">' + r.name + "</span>" +
+      '<span class="patch-meta">' + patchMetaHtml(r.info) + "</span>" +
+    "</div>";
+  }).join("");
+
+  el.innerHTML = '<div class="patches-head">🩹 최근 게임 패치</div>' + body;
 }
 
 // ---------------------------------------------------------------------------
